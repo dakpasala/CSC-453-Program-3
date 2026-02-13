@@ -16,8 +16,8 @@ time_counter = 0
 
 total_addresses = page_faults = tlb_hits = tlb_misses = 0
 
-frames = 256
-pra = ""
+frames = 256 # this was the default value that was mentioned on the spec
+pra = "FIFO" # this was the default algo that was mentioned on the spec
 backing_store = None
 
 
@@ -134,10 +134,10 @@ def main():
     print("program started")
 
     reference_file = sys.argv[1]
-    if reference_file: print("good file")
-    frames = int(sys.argv[2])
-    pra = sys.argv[3]
-    if len(pra) > 0: print("pra good")
+    n = len(sys.argv)
+    
+    if n == 3: frames = sys.argv[2]
+    if n == 4: pra = sys.argv[3]
 
     if frames <= 0 or frames > 256:
         print("frames are wrong try again")
