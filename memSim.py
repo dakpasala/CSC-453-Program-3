@@ -8,6 +8,8 @@ tlb = None
 physical_memory = []
 frame_to_page = []
 free_frames = []
+fifo_queue = deque()
+
 last_used = {}
 time_counter = 0
 
@@ -49,12 +51,16 @@ def translate_address(logical_address):
             page_faults += 1
             
             if free_frames: frame = free_frames.pop(0)
-            #else:
+            else:
                 # this will be FIFO, OPT we gotta implement later on unfort
-
                 
+                # if there are no frames, we then look at queue and pop
+                victim_frame = fifo_queue.popleft()
+                victim_page = frame_to_page[victim_frame]
 
-
+                # page isn't being used anymore
+                page_table[victim_page] = False
+                frame = victim_frame
 
             backing_store.seek(page * 256)
             data = backing_store.read(256)
@@ -64,6 +70,8 @@ def translate_address(logical_address):
             page_table[page]["frame"] = frame
             page_table[page]["present"] = True
             frame_to_page[frame] = page
+
+            fifo_queue.append(frame)
         
         tlb_insert(page, frame)
     
