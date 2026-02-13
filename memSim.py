@@ -4,15 +4,17 @@ from math import inf
 from collections import deque
 import sys
 
+# used for every algorithm
 page_table = []
 tlb = None
 physical_memory = []
 frame_to_page = []
 free_frames = []
-fifo_queue = deque()
 
-last_used = {}
-time_counter = 0
+fifo_queue = deque() # only for FIFO
+last_used = {} # only for LRU
+future_values = [] # only for OPT
+time_counter = 0 # tracking the time
 
 total_addresses = page_faults = tlb_hits = tlb_misses = 0
 
@@ -42,8 +44,6 @@ def translate_address(logical_address):
     global fifo_queue, page_table, physical_memory, frame_to_page, tlb, free_frames
     global page_faults, tlb_hits, tlb_misses
     global time_counter
-
-    time_counter += 1
     
     # get the page and offset idk if we need offset
     page, offset = get_page_offset(logical_address)
@@ -98,8 +98,43 @@ def translate_address(logical_address):
 
                     frame = page_table[victim_page]["frame"]
                     page_table[victim_page]["present"] = False
+                elif pra == "OPT":
+                    # got to look at the future for all values
 
+                    victim_page = 0
+                    victim_addr = 0
+                    max_distance = 0
 
+                    # iterate thru current page table
+                    for page, entry in enumerate(page_table):
+                        # check if present else it's not there
+                        if entry["present"]:
+
+                            # this in case its the longest u know
+                            # this is arguably the dirtiest code i've ever written this is my LC brain taking over
+                            exists_in_future = False
+                            for i in range(time_counter + 1, len(future_values)):
+                                future_page, _ = get_page_offset(future_values[i])
+                                if page == future_page:
+                                    exists_in_future = True
+                                    if i - time_counter > max_distance:
+                                        max_distance = i - time_counter
+                                        victim_page = page
+                                        victim_addr = future_values[i]
+                            
+                            if not exists_in_future:
+                                if len(future_values) - time_counter > max_distance:
+                                    max_distance = len(future_values) - time_counter
+                                    victim_page = page
+                    
+                    remove_from_tlb(victim_page)
+
+                    print(f"victim page being removed: {victim_page}. this was addr: {victim_addr}")
+
+                    frame = page_table[victim_page]["frame"]
+                    page_table[victim_page]["present"] = False
+
+            # this part i had to ask gpt, i was confused on what to store but i dont think it matters 
             backing_store.seek(page * 256)
             data = backing_store.read(256)
 
@@ -115,6 +150,8 @@ def translate_address(logical_address):
     
     physical_address = frame * 256 + offset
     value = physical_memory[frame][offset]
+
+    time_counter += 1
 
     return frame, physical_address, value
 
@@ -136,8 +173,10 @@ def main():
     reference_file = sys.argv[1]
     n = len(sys.argv)
     
-    if n == 3: frames = sys.argv[2]
-    if n == 4: pra = sys.argv[3]
+    if n >= 3: frames = int(sys.argv[2])
+    print(frames)
+    if n >= 4: pra = sys.argv[3]
+    print(pra)
 
     if frames <= 0 or frames > 256:
         print("frames are wrong try again")
@@ -171,11 +210,24 @@ def main():
             if line:
                 total_addresses += 1
                 logical_address = int(line)
-                frame, physical_address, value = translate_address(logical_address)
-                frame_bytes = physical_memory[frame]
-                frame_hex = ''.join(f"{byte:02X}" for byte in frame_bytes)
+                if pra != "OPT":
+                    frame, physical_address, value = translate_address(logical_address)
+                    frame_bytes = physical_memory[frame]
+                    frame_hex = ''.join(f"{byte:02X}" for byte in frame_bytes)
 
-                print(f"{logical_address}, {value}, {frame}, {frame_hex}")
+                    print(f"{logical_address}, {value}, {frame}, {frame_hex}")
+                else:
+                    future_values.append(logical_address)
+    
+    # okay this is p simple implementation in main just check if it's OPT and then append to future_values and now we 
+    # can iterate through it sick
+    if pra == "OPT":
+        for logical_address in future_values:
+            frame, physical_address, value = translate_address(logical_address)
+            frame_bytes = physical_memory[frame]
+            frame_hex = ''.join(f"{byte:02X}" for byte in frame_bytes)
+
+            print(f"{logical_address}, {value}, {frame}, {frame_hex}")   
     
     print(f"Number of Translated Addresses = {total_addresses}")
     print(f"Page Faults = {page_faults}")
