@@ -170,9 +170,12 @@ def main():
 
     print("program started")
 
-    reference_file = sys.argv[1]
     n = len(sys.argv)
-    
+    if (n <= 1):
+        print("no arguments provided")
+        sys.exit(1)
+        
+    reference_file = sys.argv[1]    
     if n >= 3: frames = int(sys.argv[2])
     print(frames)
     if n >= 4: pra = sys.argv[3]
