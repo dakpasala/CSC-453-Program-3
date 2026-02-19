@@ -22,6 +22,8 @@ frames = 256 # this was the default value that was mentioned on the spec
 pra = "FIFO" # this was the default algo that was mentioned on the spec
 backing_store = None
 
+tlb_len = 16
+
 
 # ------------ TLB CRAP ------------
 def tlb_lookup(page):
@@ -38,7 +40,7 @@ def tlb_insert(page, frame):
 
 def remove_from_tlb(page):
     global tlb
-    tlb = deque([(p, f) for (p, f) in tlb if p != page], maxlen=16)
+    tlb = deque([(p, f) for (p, f) in tlb if p != page], maxlen=tlb_len)
 
 def translate_address(logical_address):
     global fifo_queue, page_table, physical_memory, frame_to_page, tlb, free_frames
@@ -47,17 +49,21 @@ def translate_address(logical_address):
     
     # get the page and offset idk if we need offset
     page, offset = get_page_offset(logical_address)
+    print(f"page: {page}, time: {time_counter}")
     
     # check if it's in the TLB
     frame = tlb_lookup(page)
 
-    if frame is not None: tlb_hits += 1
+    if frame is not None: 
+        tlb_hits += 1
+        print(f"TLB hit")
     else:
         tlb_misses += 1
 
         # check if page table is present or not, im not sure if this is correct or not, we can fix tho
         if page_table[page]["present"]:
             frame = page_table[page]["frame"]
+            print(f"Page table hit (soft miss)")
         else:
             page_faults += 1
             
@@ -105,27 +111,28 @@ def translate_address(logical_address):
                     victim_addr = 0
                     max_distance = 0
 
-                    # iterate thru current page table
-                    for page, entry in enumerate(page_table):
+                    # iterate thru current page table and check if present
+                    for page_num, entry in enumerate(page_table):
                         # check if present else it's not there
                         if entry["present"]:
 
-                            # this in case its the longest u know
-                            # this is arguably the dirtiest code i've ever written this is my LC brain taking over
-                            exists_in_future = False
+                            # look at future values to see which occurs farthest in the future
+                            found_at = None
                             for i in range(time_counter + 1, len(future_values)):
                                 future_page, _ = get_page_offset(future_values[i])
-                                if page == future_page:
-                                    exists_in_future = True
-                                    if i - time_counter > max_distance:
-                                        max_distance = i - time_counter
-                                        victim_page = page
-                                        victim_addr = future_values[i]
+                                if page_num == future_page:
+                                    found_at = i - time_counter
+                                    break
                             
-                            if not exists_in_future:
-                                if len(future_values) - time_counter > max_distance:
-                                    max_distance = len(future_values) - time_counter
-                                    victim_page = page
+                            # If page never appears again, evict it immediately
+                            if found_at is None:
+                                victim_page = page_num
+                                break
+                            
+                            # Otherwise, track the page that appears farthest in the future
+                            elif found_at > max_distance:
+                                max_distance = found_at
+                                victim_page = page_num
                     
                     remove_from_tlb(victim_page)
 
@@ -133,6 +140,7 @@ def translate_address(logical_address):
 
                     frame = page_table[victim_page]["frame"]
                     page_table[victim_page]["present"] = False
+                    print(f"page fault, evicting page {victim_page} from frame {frame}")
 
             # this part i had to ask gpt, i was confused on what to store but i dont think it matters 
             backing_store.seek(page * 256)
@@ -168,8 +176,6 @@ def main():
     global frames, pra, backing_store
     global total_addresses, page_faults, tlb_hits, tlb_misses
 
-    print("program started")
-
     n = len(sys.argv)
     if (n <= 1):
         print("no arguments provided")
@@ -177,9 +183,7 @@ def main():
         
     reference_file = sys.argv[1]    
     if n >= 3: frames = int(sys.argv[2])
-    print(frames)
     if n >= 4: pra = sys.argv[3]
-    print(pra)
 
     if frames <= 0 or frames > 256:
         print("frames are wrong try again")
@@ -195,14 +199,18 @@ def main():
         for _ in range(256)
     ]
 
-    tlb = deque(maxlen=16)
+    tlb = deque(maxlen=tlb_len)
 
     physical_memory = [
         bytearray(256)
         for _ in range(frames)
     ]
-
+    
     frame_to_page = [None] * frames
+
+    
+    # Used for the initial filling of RAM since all frames are free to begin with.
+    # Once filled, we use our algorithms for eviction and replacement.
     free_frames = list(range(frames))
 
     backing_store = open("BACKING_STORE.bin", "rb")
