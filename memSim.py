@@ -37,6 +37,8 @@ def tlb_lookup(page):
 def tlb_insert(page, frame):
     global tlb
     tlb.append((page, frame))
+    # if len(tlb) > tlb_len:
+    #     print(f"TLB pop: {tlb[0]}, inserted: {(page, frame)}")
 
 def remove_from_tlb(page):
     global tlb
@@ -49,21 +51,21 @@ def translate_address(logical_address):
     
     # get the page and offset idk if we need offset
     page, offset = get_page_offset(logical_address)
-    print(f"page: {page}, time: {time_counter}")
+    # print(f"page: {page}, time: {time_counter}")
     
     # check if it's in the TLB
     frame = tlb_lookup(page)
 
     if frame is not None: 
         tlb_hits += 1
-        print(f"TLB hit")
+        # print(f"TLB hit")
     else:
         tlb_misses += 1
 
         # check if page table is present or not, im not sure if this is correct or not, we can fix tho
         if page_table[page]["present"]:
             frame = page_table[page]["frame"]
-            print(f"Page table hit (soft miss)")
+            # print(f"Page table hit (soft miss)")
         else:
             page_faults += 1
             
@@ -71,6 +73,7 @@ def translate_address(logical_address):
                 frame = free_frames.pop(0)
                 fifo_queue.append(frame)
             else:
+                # print(f"Page fault, looking for page {page} RAM state: {[frame_to_page[i] for i in range(frames)]}, TLB state: {list(tlb)}")
                 # this will be FIFO, OPT we gotta implement later on unfort
                 if pra == "FIFO":
                     # if there are no frames, we then look at queue and pop
@@ -136,11 +139,11 @@ def translate_address(logical_address):
                     
                     remove_from_tlb(victim_page)
 
-                    print(f"victim page being removed: {victim_page}. this was addr: {victim_addr}")
+                    # print(f"victim page being removed: {victim_page}. this was addr: {victim_addr}")
 
                     frame = page_table[victim_page]["frame"]
                     page_table[victim_page]["present"] = False
-                    print(f"page fault, evicting page {victim_page} from frame {frame}")
+                    # print(f"page fault, evicting page {victim_page} from frame {frame}")
 
             # this part i had to ask gpt, i was confused on what to store but i dont think it matters 
             backing_store.seek(page * 256)
