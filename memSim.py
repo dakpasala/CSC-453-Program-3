@@ -229,6 +229,7 @@ def main():
                     frame_bytes = physical_memory[frame]
                     frame_hex = ''.join(f"{byte:02X}" for byte in frame_bytes)
 
+                    if value > 127: value -= 256
                     print(f"{logical_address}, {value}, {frame}, {frame_hex}")
                 else:
                     future_values.append(logical_address)
@@ -241,6 +242,7 @@ def main():
             frame_bytes = physical_memory[frame]
             frame_hex = ''.join(f"{byte:02X}" for byte in frame_bytes)
 
+            if value > 127: value -= 256
             print(f"{logical_address}, {value}, {frame}, {frame_hex}")   
     
     print(f"Number of Translated Addresses = {total_addresses}")
